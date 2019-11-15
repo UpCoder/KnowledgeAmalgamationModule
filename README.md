@@ -27,8 +27,8 @@ python ./models.py --step=1
 This will train the component net by MNIST supervision. After that, we can get the well-trained component net
 (In the paper, the component is obtained by unsupervised training, but we trained it by labeled data for sake of simplicity).
 
-* `step=2` represents that we unsupervised train the source net. 
-* `step=3` represents that evaluate the effectiveness of source net. 
+* `step=2` represents that we unsupervised train the target net. 
+* `step=3` represents that evaluate the effectiveness of target net.
 
 ## Released Model 
 - Google Drive
