@@ -23,8 +23,8 @@ def return_whole_mnist():
         assert False
     x_train = x_train.astype('float32')
     x_test = x_test.astype('float32')
-    x_train /= 255.
-    x_test /= 255.
+    # x_train /= 255.
+    # x_test /= 255.
     print(np.shape(x_train), np.shape(y_train), np.shape(x_test), np.shape(y_test))
     return x_train, y_train, x_test, y_test
 
@@ -41,6 +41,7 @@ def return_part_mnist(labels):
         res_x_test.extend(x_test[y_test == label])
         res_y_test.extend([label] * np.sum(y_test == label))
     random_index = list(range(len(res_x_train)))
+    np.random.seed(2019)
     np.random.shuffle(random_index)
     res_x_train = np.asarray(res_x_train, np.float)
     res_y_train = np.asarray(res_y_train)

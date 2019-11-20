@@ -20,8 +20,9 @@ def build_base_model(model_name='vgg16', include_top=False, classes=2, name='1_2
             org_input_tensor = tf.keras.layers.Input((28, 28, 1))
         print(org_input_tensor)
         input_tensor = tf.tile(org_input_tensor, [1, 1, 1, 3])
-        resize_layer = tf.keras.layers.Lambda(lambda x: tf.image.resize(x, [128, 128]))
-        input_tensor = resize_layer(input_tensor)
+        preprocess_layer = tf.keras.layers.Lambda(
+            lambda x: tf.keras.applications.vgg16.preprocess_input(tf.image.resize(x, [128, 128])))
+        input_tensor = preprocess_layer(input_tensor)
         if model_name == 'vgg16':
             base_model = keras.applications.vgg16.VGG16(include_top=include_top, input_tensor=input_tensor, name=name)
             layers = base_model.layers
@@ -50,14 +51,15 @@ def build_base_model(model_name='vgg16', include_top=False, classes=2, name='1_2
         classifier_layer = tf.keras.layers.Dense(units=classes, activation=None, name='classifier'+name)
 
         logits = classifier_layer(tf.keras.layers.GlobalAveragePooling2D()(block_outputs[-1]))
-        component_net = tf.keras.models.Model(org_input_tensor, logits, name='componentNet_' + name)
+        component_net = tf.keras.models.Model(org_input_tensor, tf.keras.backend.softmax(logits),
+                                              name='componentNet_' + name)
         if restore_path is not None:
             component_net.load_weights(restore_path)
         component_net.trainable = trainable
         return component_net, block_outputs, logits
 
 
-def train_component_net(label1, label2):
+def train_component_net(label1, label2, lr=1e-5):
     '''
     一般是训练一个binary的二分类任务
     :param label1
@@ -72,10 +74,13 @@ def train_component_net(label1, label2):
     y_test[y_test == label2] = 1
     print(y_train[:128])
     print(y_test[:128])
+    y_train = tf.keras.utils.to_categorical(y_train, 2)
+    y_test = tf.keras.utils.to_categorical(y_test, 2)
     component_net, block_outputs, logits = build_base_model(name='{}_{}'.format(label1, label2), classes=2)
     print(component_net.inputs)
-    component_net.compile(loss=keras.losses.sparse_categorical_crossentropy,
-                          optimizer=keras.optimizers.Adam(lr=0.00001),
+    component_net.compile(loss=keras.losses.categorical_crossentropy,
+                          optimizer=keras.optimizers.Adam(lr),
+                          # optimizer=keras.optimizers.SGD(lr=lr, momentum=0.99),
                           metrics=['accuracy'])
     print(np.shape(x_train), np.shape(y_train))
     component_net.fit(x_train, y_train, batch_size=256, epochs=3, verbose=1)
@@ -252,12 +257,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--step', type=int, default=1, help='the step ID, 1 or 2 or 3')
     args = vars(parser.parse_args())
-    if args['step'] == 1:
+    if args['step'] == 0:
         # 训练一个网络，可以分类0, 1
-        train_component_net(0, 1)
-        # 训练一个网络，可以分类2，3
-        train_component_net(2, 3)
+        train_component_net(0, 1, lr=1e-5)
         evaluate_component(0, 1)
+    elif args['step'] == 1:
+
+        # 训练一个网络，可以分类2，3
+        train_component_net(2, 3, lr=1e-5)
         evaluate_component(2, 3)
     elif args['step'] == 2:
         train_student_net(0, 1, 2, 3)
