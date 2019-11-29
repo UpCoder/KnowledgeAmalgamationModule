@@ -5,7 +5,8 @@ sm.set_framework('tf.keras')
 
 
 class SegmentationModel:
-    def __init__(self, model_name, backbone_name, num_classes, activation='softmax', input_tensor=None, name=None):
+    def __init__(self, model_name, backbone_name, num_classes, activation='softmax', input_tensor=None, name=None,
+                 trainable=True):
         # build the basic segmentation model
         with tf.variable_scope(name) as vc:
             if model_name == 'unet':
@@ -80,7 +81,10 @@ class SegmentationModel:
         for layer in self.seg_model.layers:
             layer._name = layer._name + '_' + name
             print(layer.name, layer.output, layer.weights)
-
+            if not trainable:
+                layer.trainable = False
+        if not trainable:
+            self.seg_model.trainable = False
         print(self.seg_model)
         if input_tensor is not None:
             self.prediction = self.seg_model(self.preprocessing_layer(input_tensor))

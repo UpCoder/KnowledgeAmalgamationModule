@@ -52,7 +52,7 @@ def main():
 
     # callbacks
     tensorboard_callback = Tensorboard(summary_op=tf.summary.merge_all(), log_dir='./log/', batch_interval=10)
-    cb_checkpointer = CustomCheckpointer(args['save_dir'], trained_model, monitor='loss',
+    cb_checkpointer = CustomCheckpointer(args['save_dir'], seg_model.seg_model, monitor='loss',
                                          mode='min', save_best_only=False, verbose=1,
                                          prefix='{}-{}-{}'.format(args['target_name'], args['model_name'],
                                                                   args['backbone_name']))

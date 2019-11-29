@@ -32,7 +32,7 @@ class Tensorboard(tf.keras.callbacks.Callback):
 
 class CustomCheckpointer(tf.keras.callbacks.Callback):
     def __init__(self, filepath, custom_model, monitor, mode, save_best_only,
-                 verbose=0, verbose_description='encoder', batch_interval=1000, prefix=''):
+                 verbose=0, verbose_description='encoder', batch_interval=10, prefix=''):
         self.filepath = filepath
         self.custom_model = custom_model
         self.monitor = monitor
@@ -58,6 +58,29 @@ class CustomCheckpointer(tf.keras.callbacks.Callback):
                 print('Saving the custom {} model to {}'.format(
                     self.description, self.filepath))
             self.best = current
-            cur_file_path = self.filepath + '{}-ep{:02d}-End-loss{:.4f}.tf'.format(self.prefix, self.epoch,
+            cur_file_path = self.filepath + '{}-ep{:02d}-End-loss{:.4f}.h5'.format(self.prefix, self.epoch,
                                                                                    np.mean(current))
             self.custom_model.save_weights(cur_file_path, overwrite=True)
+
+    # def on_batch_end(self, batch, logs=None):
+    #     current = logs.get(self.monitor)
+    #     # print current
+    #     if batch % self.batch_interval == 0:
+    #         if not self.save_best_only:
+    #             if self.verbose > 0:
+    #                 print('Saving the custom {} model to {}'.format(
+    #                     self.description, self.filepath))
+    #             self.best = current
+    #             cur_file_path = self.filepath + 'ep{:02d}-batch{:06d}-loss{:.4f}.h5'.format(self.epoch, batch,
+    #                                                                                         np.mean(current))
+    #             # print self.custom_model, cur_file_path
+    #             self.custom_model.save_weights(cur_file_path, overwrite=True)
+    #         else:
+    #             if self.monitor_op(current, self.best):
+    #                 if self.verbose > 0:
+    #                     print('Saving the custom {} model to {}'.format(
+    #                         self.description, self.filepath))
+    #                 self.best = current
+    #                 cur_file_path = self.filepath + 'ep{:02d}-batch{:06d}-loss{:.4f}.h5'.format(self.epoch, batch,
+    #                                                                                             np.mean(current))
+    #                 self.custom_model.save_weights(cur_file_path, overwrite=True)

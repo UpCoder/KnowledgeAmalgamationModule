@@ -18,15 +18,12 @@ class Utils:
 
 def evaluate_teacher():
     restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/' \
-                   'spleen-unet-vgg-ep49-End-loss0.0005.tf'
+                   'liver-unet-vgg-ep49-End-loss0.0015.h5'
     base_name = os.path.basename(restore_path)
     target_name, model_name, backbone_name = base_name.split('-')[:3]
     input_layer = tf.keras.layers.Input(shape=(512, 512, 3))
     seg_model = SegmentationModel(model_name, backbone_name, 2, name=target_name, input_tensor=input_layer)
-    # seg_model.restore(restore_path)
-    evaluate_model = tf.keras.models.Model(inputs=input_layer, outputs=seg_model.prediction)
-    evaluate_model.load_weights(restore_path)
-    # for idx in config.EVALUATING_RANGE:
+    seg_model.restore(restore_path)
     dices = []
     for idx in config.EVALUATING_RANGE:
         print(idx)
@@ -53,7 +50,7 @@ def evaluate_teacher():
         img = np.concatenate([img, img, img], axis=-1)
         img = np.asarray(img, np.float)
 
-        prediction_probs = evaluate_model.predict(img, batch_size=8, verbose=1)
+        prediction_probs = seg_model.predict(img, batch_size=8)
         prediction = np.argmax(prediction_probs, axis=-1)
         save_nii_path = os.path.join(config.RAW_DATA_EVALUATING_DIR, 'pred', 'pred_' + case_name[:-4] + '.mhd')
         save_mhd_image(np.transpose(prediction, axes=[0, 2, 1]), save_nii_path)
