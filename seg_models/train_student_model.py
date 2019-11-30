@@ -1,12 +1,18 @@
+import sys
+sys.path.append('..')
+sys.path.append('.')
 import tensorflow as tf
 from seg_models.SegmentationModels import SegmentationModel
 from datasets.Abdomen.parse_tfrecords import parse_tfrecords
 from datasets.Abdomen import config as Abdomen_config
 import os
-from seg_models import config as Seg_config
+from seg_models.config import TRAINING_STUDENT as training_config
 import argparse
 from modules import FeatureAlignmentModule
+from callbacks import CustomCheckpointer, Tensorboard
 global args
+import segmentation_models as sm
+sm.set_framework('tf.keras')
 
 
 def compute_entropy(output, axis=-1, need_softmax=False):
@@ -42,7 +48,7 @@ def selective_strategy(t1_prediction, t2_prediction, t1_entropy, t2_entropy):
     ones_mask = tf.keras.backend.ones_like(t1_prediction)
     twos_mask = tf.keras.backend.ones_like(t1_prediction) * 2
     selective_mask = tf.keras.backend.zeros_like(t1_prediction)
-    both_pos_mask = tf.where(tf.logical_and(tf.equal(t1_prediction, 1), tf.equal(t1_prediction, 1)), ones_mask,
+    both_pos_mask = tf.where(tf.logical_and(tf.equal(t1_prediction, 1), tf.equal(t2_prediction, 1)), ones_mask,
                              zeros_mask)
     both_neg_mask = tf.where(tf.logical_and(tf.equal(t1_prediction, 0), tf.equal(t2_prediction, 0)), ones_mask,
                              zeros_mask)
@@ -50,12 +56,24 @@ def selective_strategy(t1_prediction, t2_prediction, t1_entropy, t2_entropy):
                                zeros_mask)
     t1_less_t2_mask = tf.where(tf.less_equal(t1_entropy, t2_entropy), ones_mask, twos_mask)
 
-    selective_mask = tf.where(tf.logical_and(single_pos_mask, tf.equal(t1_prediction, 1)), ones_mask, selective_mask)
-    selective_mask = tf.where(tf.logical_and(single_pos_mask, tf.equal(t2_prediction, 1)), twos_mask, selective_mask)
-    selective_mask = tf.where(tf.logical_and(both_neg_mask, t1_less_t2_mask), ones_mask, selective_mask)
-    selective_mask = tf.where(tf.logical_and(both_neg_mask, tf.logical_not(t1_less_t2_mask)), twos_mask, selective_mask)
-    selective_mask = tf.where(tf.logical_and(both_pos_mask, t1_less_t2_mask), ones_mask, selective_mask)
-    selective_mask = tf.where(tf.logical_and(both_pos_mask, tf.logical_not(t1_less_t2_mask)), twos_mask, selective_mask)
+    # 将t1 预测为1，t2预测为0 的位置置为1
+    selective_mask = tf.where(tf.logical_and(tf.equal(single_pos_mask, 1), tf.equal(t1_prediction, 1)), ones_mask,
+                              selective_mask)
+    # 将t1 预测为0，t2预测为1 的位置置为2
+    selective_mask = tf.where(tf.logical_and(tf.equal(single_pos_mask, 1), tf.equal(t2_prediction, 1)), twos_mask,
+                              selective_mask)
+    # 将两个位置均为0的位置，t1的熵小于t2的位置置为1
+    selective_mask = tf.where(tf.logical_and(tf.equal(both_neg_mask, 1), tf.equal(t1_less_t2_mask, 1)), ones_mask,
+                              selective_mask)
+    # 将两个位置均为0的位置，t1的熵大于t2的位置置为1
+    selective_mask = tf.where(tf.logical_and(tf.equal(both_neg_mask, 1), tf.equal(t1_less_t2_mask, 2)), twos_mask,
+                              selective_mask)
+    # 将两个位置均为1的位置，t1的熵小于t2的位置置为1
+    selective_mask = tf.where(tf.logical_and(tf.equal(both_pos_mask, 1), tf.equal(t1_less_t2_mask, 1)), ones_mask,
+                              selective_mask)
+    # 将两个位置均为1的位置，t1的熵大于t2的位置置为1
+    selective_mask = tf.where(tf.logical_and(tf.equal(both_pos_mask, 1), tf.equal(t1_less_t2_mask, 2)), twos_mask,
+                              selective_mask)
     return selective_mask
 
 
@@ -73,8 +91,8 @@ def main():
 
     batch_images, batch_masks = parse_tfrecords(
         dataset_dir=os.path.join(Abdomen_config.RAW_DATA_TF_DIR, args['dataset_name']),
-        batch_size=Seg_config.TRAINING['batch_size'], shuffle_size=Seg_config.TRAINING['shuffle_size'],
-        prefetch_size=Seg_config.TRAINING['prefetch_size'])
+        batch_size=training_config['batch_size'], shuffle_size=training_config['shuffle_size'],
+        prefetch_size=training_config['prefetch_size'])
     batch_images_input = tf.keras.layers.Input(tensor=batch_images)
 
     # build the basic model (student, teacher, teacher)
@@ -85,7 +103,17 @@ def main():
                                  batch_images_input, name=args['t2_name'], trainable=False)
     t2_model.restore(args['t2_restore_path'])
     s_model = SegmentationModel(args['student_model_name'], args['student_backbone_name'], 2,
-                                args['student_activation'], batch_images_input, name=args['student_name'])
+                                args['student_activation'], input_tensor=batch_images_input, name=args['student_name'],
+                                trainable=True)
+
+    # add to tensorboard
+    tf.summary.image('input', batch_images_input, max_outputs=3)
+    tf.summary.image('prediction/t1', tf.cast(tf.expand_dims(t1_model.prediction[:, :, :, 1], axis=3) * 200, tf.uint8),
+                     max_outputs=3)
+    tf.summary.image('prediction/t2', tf.cast(tf.expand_dims(t2_model.prediction[:, :, :, 1], axis=3) * 200, tf.uint8),
+                     max_outputs=3)
+    tf.summary.image('prediction/student', tf.expand_dims(s_model.prediction[:, :, :, 1], axis=3), max_outputs=3)
+    tf.summary.image('gt', tf.expand_dims(tf.cast(batch_masks * 100, tf.uint8), axis=3), max_outputs=3)
 
     # build the block loss
     t1_fa_blocks = [FeatureAlignmentModule(encoder_output.get_shape().as_list()[-1] // 2, require_resize=True) for
@@ -97,23 +125,62 @@ def main():
     t2_fa_blocks_outputs = [t2_fa_blocks[i].call(t2_model.encoder_outputs[i], s_model.encoder_outputs[i]) for i in
                             range(len(t2_model.encoder_outputs))]
     # the element is matrix B 512, 512
-    t1_s_block_loss = [FeatureAlignmentModule.block_loss(*t1_fa_blocks_outputs[i], pixel_wise=True) for i in
-                       range(len(t1_model.encoder_outputs))]
-    t2_s_block_loss = [FeatureAlignmentModule.block_loss(*t2_fa_blocks_outputs[i], pixel_wise=True) for i in
-                       range(len(t1_model.encoder_outputs))]
+    t1_s_blocks_losses = [FeatureAlignmentModule.block_loss(*t1_fa_blocks_outputs[i], pixel_wise=True) for i in
+                          range(len(t1_model.encoder_outputs))]
+    t2_s_blocks_losses = [FeatureAlignmentModule.block_loss(*t2_fa_blocks_outputs[i], pixel_wise=True) for i in
+                          range(len(t1_model.encoder_outputs))]
+    print('t1_s_blocks_losses are ', t1_s_blocks_losses)
+    print('t2_s_blocks_losses are ', t2_s_blocks_losses)
+    for i in range(len(t1_model.encoder_outputs)):
+        tf.summary.scalar('t1_blocks_losses/level_{}'.format(i), tf.reduce_mean(t1_s_blocks_losses[i]))
+        tf.summary.scalar('t2_blocks_losses/level_{}'.format(i), tf.reduce_mean(t2_s_blocks_losses[i]))
+    t1_s_block_loss = tf.add_n(t1_s_blocks_losses) / (1.0 * len(t1_model.encoder_outputs))
+    t2_s_block_loss = tf.add_n(t2_s_blocks_losses) / (1.0 * len(t1_model.encoder_outputs))
+    tf.summary.scalar('t1_blocks_losses/average', tf.reduce_mean(t1_s_block_loss))
+    tf.summary.scalar('t2_blocks_losses/average', tf.reduce_mean(t2_s_block_loss))
 
+    # build the selective mask tensor
     get_entropy_layer = tf.keras.layers.Lambda(lambda x: compute_entropy(x))
     t1_entropy = get_entropy_layer(t1_model.prediction)
     t2_entropy = get_entropy_layer(t2_model.prediction)
     selective_mask = selective_strategy(t1_model.prediction, t2_model.prediction, t1_entropy, t2_entropy)
-    tf.summary.image('selective_mask', tf.expand_dims(selective_mask * 100, axis=3), max_outputs=3)
+    print('selective_mask is ', selective_mask)
+    tf.summary.image('selective_mask', tf.cast(tf.expand_dims(selective_mask * 100, axis=3), tf.uint8), max_outputs=3)
 
-    get_soft_loss_layer = tf.keras.layers.Lambda(lambda x: (lambda t, s: compute_entropy(t, s))(*x))
-    t1_soft_loss = get_soft_loss_layer(t1_model.decoder_outputs[-1], s_model.decoder_outputs[-1])
-    t2_soft_loss = get_soft_loss_layer(t2_model.decoder_outputs[-1], s_model.decoder_outputs[-1])
+    # build the last logits loss
+    get_soft_loss_layer = tf.keras.layers.Lambda(lambda x: (lambda t, s: compute_soft_loss(t, s))(*x))
+    print(t1_model.decoder_outputs[-1], s_model.decoder_outputs[-1])
+    t1_soft_loss = get_soft_loss_layer((t1_model.decoder_outputs[-1], s_model.decoder_outputs[-1]))
+    t2_soft_loss = get_soft_loss_layer((t2_model.decoder_outputs[-1], s_model.decoder_outputs[-1]))
+    print('t1_soft_loss is ', t1_soft_loss)
+    print('t2_soft_loss is ', t2_soft_loss)
+    tf.summary.scalar('soft_loss/t1', tf.reduce_mean(t1_soft_loss))
+    tf.summary.scalar('soft_loss/t2', tf.reduce_mean(t2_soft_loss))
+    # build the total loss for teacher1 or teacher2
+    soft_coff = 1.0
+    block_coff = 0.0
+    t1_loss = block_coff * t1_s_block_loss + t1_soft_loss * soft_coff
+    t2_loss = block_coff * t2_s_block_loss + t2_soft_loss * soft_coff
 
+    # build the selective loss
+    selective_loss = tf.zeros_like(selective_mask, dtype=tf.float32)
+    print(selective_mask, selective_loss, t1_loss, t2_loss)
+    selective_loss = tf.where(tf.equal(selective_mask, 1), t1_loss, selective_loss)
+    selective_loss = tf.where(tf.equal(selective_mask, 2), t2_loss, selective_loss)
+
+    # build the trained model
     trained_model = tf.keras.models.Model(inputs=batch_images_input,
                                           outputs=[t1_model.prediction, t2_model.prediction, s_model.prediction])
+    trained_model.add_loss(selective_loss)
+    trained_model.compile(optimizer=tf.keras.optimizers.Adam(1e-4))
+    tensorboard_callback = Tensorboard(summary_op=tf.summary.merge_all(), log_dir='./log/', batch_interval=10)
+    cb_checkpointer = CustomCheckpointer(args['save_dir'], s_model.seg_model, monitor='loss',
+                                         mode='min', save_best_only=False, verbose=1,
+                                         prefix='{}-{}-{}'.format(args['student_name'], args['student_model_name'],
+                                                                  args['student_backbone_name']))
+    trained_model.fit(epochs=args['num_epoches'],
+                      steps_per_epoch=Abdomen_config.get_dataset_config(args['dataset_name'])['size'] //
+                                      training_config['batch_size'], callbacks=[tensorboard_callback, cb_checkpointer])
 
 
 if __name__ == '__main__':
@@ -123,7 +190,10 @@ if __name__ == '__main__':
                         help='the network student used')
     parser.add_argument('-t1_b', '--t1_backbone_name', type=str, default='vgg',
                         help='the network student used')
-    parser.add_argument('-t1_r', '--t1_restore_path', type=str, default=None, help='')
+    parser.add_argument('-t1_r', '--t1_restore_path', type=str,
+                        default='/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/'
+                                'liver-unet-vgg-ep49-End-loss0.0015.h5',
+                        help='')
     parser.add_argument('-t1_n', '--t1_name', type=str, default='liver', help='')
     parser.add_argument('-t1_a', '--t1_activation', type=str, default='softmax',
                         help='the dataset dir which storage tfrecords files ')
@@ -132,7 +202,10 @@ if __name__ == '__main__':
                         help='the network student used')
     parser.add_argument('-t2_b', '--t2_backbone_name', type=str, default='vgg',
                         help='the network student used')
-    parser.add_argument('-t2_r', '--t2_restore_path', type=str, default=None, help='')
+    parser.add_argument('-t2_r', '--t2_restore_path', type=str,
+                        default='/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/'
+                                'spleen-unet-vgg-ep49-End-loss0.0006.h5',
+                        help='')
     parser.add_argument('-t2_n', '--t2_name', type=str, default='spleen', help='')
     parser.add_argument('-t2_a', '--t2_activation', type=str, default='softmax',
                         help='the dataset dir which storage tfrecords files ')
@@ -143,6 +216,8 @@ if __name__ == '__main__':
                         help='the network student used')
     parser.add_argument('-s_a', '--student_activation', type=str, default='softmax',
                         help='the dataset dir which storage tfrecords files ')
+    parser.add_argument('-s_name', '--student_name', type=str, default='liver_spleen',
+                        help='the network student used')
 
     parser.add_argument('-d_m', '--dataset_name', type=str, default='V1',
                         help='the name of dataset')
@@ -152,3 +227,4 @@ if __name__ == '__main__':
     parser.add_argument('-n_e', '--num_epoches', type=int, default=50,
                         help='')
     args = vars(parser.parse_args())
+    main()
