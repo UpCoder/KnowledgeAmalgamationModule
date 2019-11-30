@@ -4,20 +4,30 @@ import numpy as np
 
 
 class FeatureAlignmentModule:
-    def __init__(self, num_filter):
+    def __init__(self, num_filter, require_resize=False):
         self.conv_layer_1 = tf.keras.layers.Conv2D(num_filter, kernel_size=(1, 1), strides=[1, 1], activation=None,
                                                    trainable=True, use_bias=False)
         self.conv_layer_2 = tf.keras.layers.Conv2D(num_filter, kernel_size=(1, 1), strides=[1, 1], activation=None,
                                                    trainable=True, use_bias=False)
+        self.require_resize = require_resize
+        if self.require_resize:
+            self.resize_layer = tf.keras.layers.Lambda(lambda x: tf.image.resize_images(x, [512, 512]))
 
     def call(self, input_tensor1, input_tensor2):
         output_1 = self.conv_layer_1(input_tensor1)
+        if self.require_resize:
+            output_1 = self.resize_layer(output_1)
         output_2 = self.conv_layer_2(input_tensor2)
+        if self.require_resize:
+            output_2 = self.resize_layer(output_2)
         return output_1, output_2, self.conv_layer_1.weights[0], self.conv_layer_2.weights[0]
 
     @staticmethod
-    def block_loss(t_o, s_o, t_weight, s_weight):
-        loss_1 = tf.keras.backend.mean(tf.keras.losses.mean_squared_error(t_o, s_o), axis=[1, 2])
+    def block_loss(t_o, s_o, t_weight, s_weight, pixel_wise=False):
+        if pixel_wise:
+            loss_1 = tf.keras.losses.mean_squared_error(t_o, s_o)
+        else:
+            loss_1 = tf.keras.backend.mean(tf.keras.losses.mean_squared_error(t_o, s_o), axis=[1, 2])
         loss_reg_t = tf.keras.backend.mean(tf.keras.losses.mean_squared_error(t_weight, 1.))
         loss_reg_s = tf.keras.backend.mean(tf.keras.losses.mean_squared_error(s_weight, 1.))
         print(loss_1, loss_reg_t, loss_reg_s)
