@@ -2,7 +2,7 @@ import tensorflow as tf
 from datasets.Abdomen.parse_tfrecords import parse_tfrecords
 from seg_models.SegmentationModels import SegmentationModel
 from datasets.Abdomen import config as Abdomen_config
-from seg_models import config as Seg_config
+from seg_models.config import TRAINING as training_config
 import argparse
 import os
 from callbacks import Tensorboard, CustomCheckpointer
@@ -20,8 +20,8 @@ def main():
     # prepare dataset
     batch_images, batch_masks = parse_tfrecords(
         dataset_dir=os.path.join(Abdomen_config.RAW_DATA_TF_DIR, args['dataset_name']),
-        batch_size=Seg_config.TRAINING['batch_size'], shuffle_size=Seg_config.TRAINING['shuffle_size'],
-        prefetch_size=Seg_config.TRAINING['prefetch_size'])
+        batch_size=training_config['batch_size'], shuffle_size=training_config['shuffle_size'],
+        prefetch_size=training_config['prefetch_size'])
     batch_images_input = tf.keras.layers.Input(tensor=batch_images)
     batch_masks = tf.keras.backend.cast(tf.keras.backend.equal(batch_masks, args['target_label']), tf.int32)
 
@@ -58,8 +58,7 @@ def main():
                                                                   args['backbone_name']))
     trained_model.fit(epochs=args['num_epoches'],
                       steps_per_epoch=Abdomen_config.get_dataset_config(args['dataset_name'])['size'] //
-                                      Seg_config.TRAINING['batch_size'],
-                      callbacks=[tensorboard_callback, cb_checkpointer])
+                                      training_config['batch_size'], callbacks=[tensorboard_callback, cb_checkpointer])
 
 
 if __name__ == '__main__':
