@@ -40,13 +40,15 @@ DATASET_V1 = {
     'name': 'V1',
     'size': 1500,
     'window_center': 40,
-    'window_width': 250
+    'window_width': 250,
+    'prob': None,
 }
 DATASET_V2 = {
     'name': 'V2',
-    'size': 1678,
-    'window_center': 40,
-    'window_width': 250
+    'size': 1700,
+    'window_center': 100,
+    'window_width': 400,
+    'prob': 0.5
 }
 
 EVALUATING_RANGE = range(1, 11)

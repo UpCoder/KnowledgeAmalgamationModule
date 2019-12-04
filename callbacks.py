@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import backend as K
 import numpy as np
+import os
 
 
 class Tensorboard(tf.keras.callbacks.Callback):
@@ -58,8 +59,8 @@ class CustomCheckpointer(tf.keras.callbacks.Callback):
                 print('Saving the custom {} model to {}'.format(
                     self.description, self.filepath))
             self.best = current
-            cur_file_path = self.filepath + '{}-ep{:02d}-End-loss{:.4f}.h5'.format(self.prefix, self.epoch,
-                                                                                   np.mean(current))
+            cur_file_path = os.path.join(self.filepath, '{}-ep{:02d}-End-loss{:.4f}.h5'.format(self.prefix, self.epoch,
+                                                                                   np.mean(current)))
             self.custom_model.save_weights(cur_file_path, overwrite=True)
 
     # def on_batch_end(self, batch, logs=None):

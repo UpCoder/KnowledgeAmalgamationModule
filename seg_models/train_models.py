@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+sys.path.append('.')
 import tensorflow as tf
 from datasets.Abdomen.parse_tfrecords import parse_tfrecords
 from seg_models.SegmentationModels import SegmentationModel
@@ -36,8 +39,7 @@ def main():
     tf.summary.image('gt', tf.expand_dims(tf.cast(batch_masks * 200, tf.uint8), axis=3), max_outputs=3)
 
     # calculate the loss
-    final_ce_loss = seg_model.build_loss(batch_masks)
-    tf.summary.scalar('loss/final_ce_loss', tf.reduce_mean(final_ce_loss))
+    final_loss = seg_model.build_loss(batch_masks, cross_entropy_coff=args['cross_entropy'], dice_coff=args['dice'])
 
     # build the trained model
     trained_model = tf.keras.Model(inputs=batch_images_input, outputs=seg_model.prediction, name='final_model')
@@ -47,12 +49,12 @@ def main():
         trained_model.load_weights(args['restore_path'])
 
     # configuration about the trained model
-    trained_model.add_loss(final_ce_loss)
+    trained_model.add_loss(final_loss)
     trained_model.compile(tf.keras.optimizers.Adam(lr=1e-4))
 
     # callbacks
     tensorboard_callback = Tensorboard(summary_op=tf.summary.merge_all(), log_dir='./log/', batch_interval=10)
-    cb_checkpointer = CustomCheckpointer(args['save_dir'], seg_model.seg_model, monitor='loss',
+    cb_checkpointer = CustomCheckpointer(os.path.join(args['save_dir'], args['dataset_name']), seg_model.seg_model, monitor='loss',
                                          mode='min', save_best_only=False, verbose=1,
                                          prefix='{}-{}-{}'.format(args['target_name'], args['model_name'],
                                                                   args['backbone_name']))
@@ -68,12 +70,12 @@ if __name__ == '__main__':
                         help='the network student used')
     parser.add_argument('-b', '--backbone_name', type=str, default='vgg',
                         help='the network student used')
-    parser.add_argument('-d_m', '--dataset_name', type=str, default='V1',
+    parser.add_argument('-d_m', '--dataset_name', type=str, default='V2',
                         help='the name of dataset')
     parser.add_argument('-a', '--activation', type=str, default='softmax',
                         help='the dataset dir which storage tfrecords files ')
     parser.add_argument('-s', '--save_dir', type=str,
-                        default='/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/')
+                        default='/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/')
     parser.add_argument('-t_n', '--target_name', type=str, default='liver',
                         help='spleen / liver')
     parser.add_argument('-t_l', '--target_label', type=int, default=2,
@@ -85,5 +87,8 @@ if __name__ == '__main__':
                         # default='/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/'
                         #         'liver-unet-vgg-ep10-End-loss0.0060.tf'
                         )
+    parser.add_argument('-l_c', '--cross_entropy', type=float, default=1.0)
+    parser.add_argument('-l_d', '--dice', type=float, default=0.0)
+    parser.add_argument('-l_f', '--focal_loss', type=float, default=0.0)
     args = vars(parser.parse_args())
     main()

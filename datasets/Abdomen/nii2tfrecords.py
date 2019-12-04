@@ -20,7 +20,7 @@ def convert_nii2tfrecords_with_label(case_name, labels_mapping={1: 1, 6: 2}, sav
     try:
         with tf.python_io.TFRecordWriter(os.path.join(save_dir, name, case_name.split('.nii')[0]+'.tfrecords')) as writer:
             for img_slice, label_slice in tqdm(zip(img_slices, label_slices)):
-                if name == 'V1':
+                if name == 'V1' or name == 'V2':
                     img_slice = np.expand_dims(img_slice, axis=2)
                     img_slice = np.concatenate([img_slice, img_slice, img_slice], axis=-1)
                 example = Example()
