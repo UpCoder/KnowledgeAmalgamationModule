@@ -1,4 +1,3 @@
-import numpy as np
 import os
 from datasets.medical_image_utils import read_nii
 import tensorflow as tf
