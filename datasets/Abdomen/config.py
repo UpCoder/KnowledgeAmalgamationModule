@@ -50,11 +50,19 @@ DATASET_V2 = {
     'window_width': 400,
     'prob': 0.5
 }
+DATASET_V3 = {
+    'name': 'V3',
+    'size': 1700,
+    'window_center': None,
+    'window_width': None,
+    'prob': 0.5
+}
 
 EVALUATING_RANGE = range(1, 11)
 name2dataset = {
     'V1': DATASET_V1,
-    'V2': DATASET_V2
+    'V2': DATASET_V2,
+    'V3': DATASET_V3
 }
 
 

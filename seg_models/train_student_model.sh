@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 cd ..
-nohup python seg_models/train_student_model.py > nohup_train_student_model.log &
+nohup python seg_models/train_student_model.py --num_epoches=100 --dataset_name=V1 --t1_backbone_name=resnet --t2_backbone_name=resnet --student_backbone_name=resnet --t1_restore_path=/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/liver-unet-resnet-ep97-End-loss0.0009.h5 --t2_restore_path=/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/spleen-unet-resnet-ep99-End-loss0.0002.h5 > nohup_train_student_model.log &

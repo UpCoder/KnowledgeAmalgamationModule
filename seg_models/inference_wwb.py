@@ -146,7 +146,7 @@ def inference_single_file(nii_path, mask_path=None):
     nii_img = preprocessing(nii_img)
     input_layer = tf.keras.layers.Input(shape=(512, 512, 3))
     restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/' \
-                   'liver-unet-resnet-ep97-End-loss0.0009.h5'
+                   'liver-unet-resnet-ep99-End-loss0.0053.h5'
     base_name = os.path.basename(restore_path)
     target_name, model_name, backbone_name = base_name.split('-')[:3]
     seg_model = SegmentationModel(model_name, backbone_name, 2, name=target_name, input_tensor=input_layer)

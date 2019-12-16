@@ -33,6 +33,16 @@ def compute_entropy(output, axis=-1, need_softmax=False):
     return entropy
 
 
+def non_selective_strategy(t1_prediction, t2_prediction):
+    t1_prediction = tf.keras.backend.argmax(t1_prediction, axis=-1)
+    t2_prediction = tf.keras.backend.argmax(t2_prediction, axis=-1)
+    selective_mask = tf.keras.backend.zeros_like(t1_prediction)
+    ones_mask = tf.keras.backend.ones_like(t1_prediction)
+    selective_mask = tf.where(tf.equal(t1_prediction, 1), ones_mask, selective_mask)
+    selective_mask = tf.where(tf.equal(t2_prediction, 1), ones_mask, selective_mask)
+    return selective_mask
+
+
 def selective_strategy(t1_prediction, t2_prediction, t1_entropy, t2_entropy):
     '''
     选择，返回mask tensor，针对每个像素的选择策略
@@ -139,34 +149,40 @@ def main():
     tf.summary.scalar('t1_blocks_losses/average', tf.reduce_mean(t1_s_block_loss))
     tf.summary.scalar('t2_blocks_losses/average', tf.reduce_mean(t2_s_block_loss))
 
-    # build the selective mask tensor
-    get_entropy_layer = tf.keras.layers.Lambda(lambda x: compute_entropy(x))
-    t1_entropy = get_entropy_layer(t1_model.prediction)
-    t2_entropy = get_entropy_layer(t2_model.prediction)
-    selective_mask = selective_strategy(t1_model.prediction, t2_model.prediction, t1_entropy, t2_entropy)
-    print('selective_mask is ', selective_mask)
-    tf.summary.image('selective_mask', tf.cast(tf.expand_dims(selective_mask * 100, axis=3), tf.uint8), max_outputs=3)
+    if args['selective_flag']:
+        # build the selective mask tensor
+        get_entropy_layer = tf.keras.layers.Lambda(lambda x: compute_entropy(x))
+        t1_entropy = get_entropy_layer(t1_model.prediction)
+        t2_entropy = get_entropy_layer(t2_model.prediction)
+        selective_mask = selective_strategy(t1_model.prediction, t2_model.prediction, t1_entropy, t2_entropy)
+        print('selective_mask is ', selective_mask)
+        tf.summary.image('selective_mask', tf.cast(tf.expand_dims(selective_mask * 100, axis=3), tf.uint8),
+                         max_outputs=3)
+        # build the last logits loss
+        get_soft_loss_layer = tf.keras.layers.Lambda(lambda x: (lambda t, s: compute_soft_loss(t, s))(*x))
+        print(t1_model.decoder_outputs[-1], s_model.decoder_outputs[-1])
+        t1_soft_loss = get_soft_loss_layer((t1_model.decoder_outputs[-1], s_model.decoder_outputs[-1]))
+        t2_soft_loss = get_soft_loss_layer((t2_model.decoder_outputs[-1], s_model.decoder_outputs[-1]))
+        print('t1_soft_loss is ', t1_soft_loss)
+        print('t2_soft_loss is ', t2_soft_loss)
+        tf.summary.scalar('soft_loss/t1', tf.reduce_mean(t1_soft_loss))
+        tf.summary.scalar('soft_loss/t2', tf.reduce_mean(t2_soft_loss))
+        # build the total loss for teacher1 or teacher2
+        soft_coff = 1.0
+        block_coff = 0.0
+        t1_loss = block_coff * t1_s_block_loss + t1_soft_loss * soft_coff
+        t2_loss = block_coff * t2_s_block_loss + t2_soft_loss * soft_coff
 
-    # build the last logits loss
-    get_soft_loss_layer = tf.keras.layers.Lambda(lambda x: (lambda t, s: compute_soft_loss(t, s))(*x))
-    print(t1_model.decoder_outputs[-1], s_model.decoder_outputs[-1])
-    t1_soft_loss = get_soft_loss_layer((t1_model.decoder_outputs[-1], s_model.decoder_outputs[-1]))
-    t2_soft_loss = get_soft_loss_layer((t2_model.decoder_outputs[-1], s_model.decoder_outputs[-1]))
-    print('t1_soft_loss is ', t1_soft_loss)
-    print('t2_soft_loss is ', t2_soft_loss)
-    tf.summary.scalar('soft_loss/t1', tf.reduce_mean(t1_soft_loss))
-    tf.summary.scalar('soft_loss/t2', tf.reduce_mean(t2_soft_loss))
-    # build the total loss for teacher1 or teacher2
-    soft_coff = 1.0
-    block_coff = 0.0
-    t1_loss = block_coff * t1_s_block_loss + t1_soft_loss * soft_coff
-    t2_loss = block_coff * t2_s_block_loss + t2_soft_loss * soft_coff
-
-    # build the selective loss
-    selective_loss = tf.zeros_like(selective_mask, dtype=tf.float32)
-    print(selective_mask, selective_loss, t1_loss, t2_loss)
-    selective_loss = tf.where(tf.equal(selective_mask, 1), t1_loss, selective_loss)
-    selective_loss = tf.where(tf.equal(selective_mask, 2), t2_loss, selective_loss)
+        # build the selective loss
+        selective_loss = tf.zeros_like(selective_mask, dtype=tf.float32)
+        print(selective_mask, selective_loss, t1_loss, t2_loss)
+        selective_loss = tf.where(tf.equal(selective_mask, 1), t1_loss, selective_loss)
+        selective_loss = tf.where(tf.equal(selective_mask, 2), t2_loss, selective_loss)
+    else:
+        gen_gt_mask = non_selective_strategy(t1_prediction=t1_model.prediction, t2_prediction=t2_model.prediction)
+        selective_loss = tf.keras.losses.sparse_categorical_crossentropy(gen_gt_mask, s_model.prediction)
+        tf.summary.image('selective_mask', tf.cast(tf.expand_dims(gen_gt_mask * 100, axis=3), tf.uint8),
+                         max_outputs=3)
 
     # build the trained model
     trained_model = tf.keras.models.Model(inputs=batch_images_input,
@@ -174,10 +190,15 @@ def main():
     trained_model.add_loss(selective_loss)
     trained_model.compile(optimizer=tf.keras.optimizers.Adam(1e-4))
     tensorboard_callback = Tensorboard(summary_op=tf.summary.merge_all(), log_dir='./log/', batch_interval=10)
-    cb_checkpointer = CustomCheckpointer(args['save_dir'], s_model.seg_model, monitor='loss',
+    cb_checkpointer = CustomCheckpointer(os.path.join(args['save_dir'], args['dataset_name']), s_model.seg_model,
+                                         monitor='loss',
                                          mode='min', save_best_only=False, verbose=1,
                                          prefix='{}-{}-{}'.format(args['student_name'], args['student_model_name'],
-                                                                  args['student_backbone_name']))
+                                                                  args['student_backbone_name']) if args[
+                                             'selective_flag'] else '{}-{}-{}-False'.format(args['student_name'],
+                                                                                            args['student_model_name'],
+                                                                                            args[
+                                                                                                'student_backbone_name']))
     trained_model.fit(epochs=args['num_epoches'],
                       steps_per_epoch=Abdomen_config.get_dataset_config(args['dataset_name'])['size'] //
                                       training_config['batch_size'], callbacks=[tensorboard_callback, cb_checkpointer])
@@ -223,8 +244,10 @@ if __name__ == '__main__':
                         help='the name of dataset')
 
     parser.add_argument('-s', '--save_dir', type=str,
-                        default='/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/')
+                        default='/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/')
     parser.add_argument('-n_e', '--num_epoches', type=int, default=50,
+                        help='')
+    parser.add_argument('-s_f', '--selective_flag', type=bool, default=False,
                         help='')
     args = vars(parser.parse_args())
     main()

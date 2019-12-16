@@ -28,9 +28,9 @@ def evaluate_dual_teacher():
     # 0.955396536785528, 0.757845242446916, 0.7864991558076108, 0.873478655351284, 0.8430822023083274,
     # 0.9039349311049786]
     liver_restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/' \
-                         'liver-unet-vgg-ep49-End-loss0.0015.h5'
+                         'liver-unet-resnet-ep99-End-loss0.0053.h5'
     spleen_restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/' \
-                          'spleen-unet-vgg-ep49-End-loss0.0006.h5'
+                          'spleen-unet-resnet-ep99-End-loss0.0002.h5'
     liver_predictions = evaluate_single_teacher(liver_restore_path)
     spleen_predictions = evaluate_single_teacher(spleen_restore_path)
     target_name_list = ['liver', 'spleen']
@@ -79,13 +79,14 @@ def evaluate_single_teacher(restore_path=None):
     # dices are  [0.9466422354146996, 0.961049902786779, 0.9228719372571547, 0.9396556424721599, 0.9296169181016685,
     #  0.7467543800765255, 0.43427207329268686, 0.9059204083925962, 0.5519578801164976, 0.9154926903360546]
 
+    # liver
     # global average dice is  0.8892064336207314
     # V2/liver-unet-vgg-ep99-End-loss0.0009.h5
     # dices are  [0.9675529257852, 0.971656139315968, 0.9254148599361137, 0.9390645828817339, 0.9320660538743973,
     # 0.9161950014051498, 0.3812259390300064, 0.9565657718401224, 0.9461939440687256, 0.9561291180698972]
     if restore_path is None:
-        restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V2/' \
-                       'liver-unet-vgg-ep50-End-loss0.0017.h5'
+        restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/' \
+                       'spleen-unet-resnet-ep99-End-loss0.0002.h5'
     version_name = os.path.basename(os.path.dirname(restore_path))
     base_name = os.path.basename(restore_path)
     target_name, model_name, backbone_name = base_name.split('-')[:3]
@@ -137,8 +138,12 @@ def evaluate_student():
     # dices are[ 0.9385382739727629, 0.9361881981945765, 0.9425535644670502, 0.902743875566844,
     #  0.9523302706523095, 0.7969517367583336, 0.6466860078687823, 0.880210793498437,
     # 0.9521142126729099, 0.9582056225658377]
+
+    # global average dice is 0.9027366564929121
+    # dices are[0.9475870452516191, 0.9351968044777572, 0.953932874864064, 0.8628783860987815, 0.9597844839098552,
+    # 0.8200113246511008, 0.8613591209233888, 0.8848770232278296, 0.8473806341455292, 0.9543588673791952]
     restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck/V1/' \
-                   'liver_spleen-unet-vgg-ep30-End-loss0.1542.h5'
+                   'liver_spleen-unet-resnet-False-ep99-End-loss0.0008.h5'
     base_name = os.path.basename(restore_path)
     target_name, model_name, backbone_name = base_name.split('-')[:3]
     target_name_list = target_name.split('_')
@@ -195,6 +200,6 @@ def evaluate_student():
 
 
 if __name__ == '__main__':
-    evaluate_single_teacher()
-    # evaluate_student()
+    # evaluate_single_teacher()
+    evaluate_student()
     # evaluate_dual_teacher()
