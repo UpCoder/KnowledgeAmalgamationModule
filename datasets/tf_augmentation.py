@@ -298,13 +298,14 @@ def get_aug_tensor(output_image, output_mask, prob=0.6):
     '''
     # rotate aug
     output_image = tf.cast(output_image, tf.float32)
-    # rnd = tf.random_uniform((), minval=0, maxval=1)
-    # def rotate():
-    #     return random_rotate90(output_image, output_mask)
-    #
-    # def non_op():
-    #     return output_image, output_mask
-    # output_image, output_mask = tf.cond(tf.less(rnd, prob), rotate, non_op)
+    rnd = tf.random_uniform((), minval=0, maxval=1)
+
+    def rotate():
+        return random_rotate90(output_image, output_mask)
+
+    def non_op():
+        return output_image, output_mask
+    output_image, output_mask = tf.cond(tf.less(rnd, prob), rotate, non_op)
     #
     # if output_image.dtype != tf.float32:
     #     output_image = tf.image.convert_image_dtype(output_image, dtype=tf.float32)
@@ -328,20 +329,20 @@ def get_aug_tensor(output_image, output_mask, prob=0.6):
     # output_image, output_mask = tf.cond(tf.less(rnd, prob), flip_v, non_flip_v)
 
     # color augm
-    rnd3 = tf.random_uniform((), minval=0, maxval=1)
-
-    def color_aug():
-        tmp_img = apply_with_random_selector(
-            output_image,
-            lambda x, ordering: distort_color(x, ordering, True, divided=3.),
-            num_cases=4)
-        tmp_img = tf.cast(tmp_img, tf.float32)
-        return tmp_img
-
-    def non_color_aug():
-        tmp_img = tf.cast(output_image, tf.float32)
-        return tmp_img
-    output_image = tf.cond(tf.less(rnd3, prob), color_aug, non_color_aug)
+    # rnd3 = tf.random_uniform((), minval=0, maxval=1)
+    #
+    # def color_aug():
+    #     tmp_img = apply_with_random_selector(
+    #         output_image,
+    #         lambda x, ordering: distort_color(x, ordering, True, divided=3.),
+    #         num_cases=4)
+    #     tmp_img = tf.cast(tmp_img, tf.float32)
+    #     return tmp_img
+    #
+    # def non_color_aug():
+    #     tmp_img = tf.cast(output_image, tf.float32)
+    #     return tmp_img
+    # output_image = tf.cond(tf.less(rnd3, prob), color_aug, non_color_aug)
 
     # add noise
     rnd4 = tf.random_uniform((), minval=0, maxval=1)
@@ -358,34 +359,34 @@ def get_aug_tensor(output_image, output_mask, prob=0.6):
         return output_image
     output_image = tf.cond(tf.less(rnd4, prob), noise_aug, non_noise_aug)
 
-    rnd5 = tf.random_uniform((), minval=0, maxval=1)
-
-    def noise_aug_2():
-        tmp_image = tf.cast(output_image, tf.float32)
-        noise_mask_tensor = tf.random_normal(shape=(), mean=0.0, stddev=10,
-                                             dtype=tf.float32)
-        tmp_image += noise_mask_tensor
-        tmp_image = tf.cast(tmp_image, tf.float32)
-        return tmp_image
-
-    def non_noise_aug_2():
-        return output_image
-    output_image = tf.cond(tf.less(rnd5, prob), noise_aug_2, non_noise_aug_2)
-
-    rnd6 = tf.random_uniform((), minval=0, maxval=1)
-
-    def noise_aug_3():
-        tmp_image = tf.cast(output_image, tf.float32)
-        noise_mask_tensor = tf.random_normal(shape=(), mean=0.0, stddev=10,
-                                             dtype=tf.float32)
-        tmp_image -= noise_mask_tensor
-        tmp_image = tf.cast(tmp_image, tf.float32)
-        return tmp_image
-
-    def non_noise_aug_3():
-        return output_image
-
-    output_image = tf.cond(tf.less(rnd6, prob), noise_aug_3, non_noise_aug_3)
+    # rnd5 = tf.random_uniform((), minval=0, maxval=1)
+    #
+    # def noise_aug_2():
+    #     tmp_image = tf.cast(output_image, tf.float32)
+    #     noise_mask_tensor = tf.random_normal(shape=(), mean=0.0, stddev=10,
+    #                                          dtype=tf.float32)
+    #     tmp_image += noise_mask_tensor
+    #     tmp_image = tf.cast(tmp_image, tf.float32)
+    #     return tmp_image
+    #
+    # def non_noise_aug_2():
+    #     return output_image
+    # output_image = tf.cond(tf.less(rnd5, prob), noise_aug_2, non_noise_aug_2)
+    #
+    # rnd6 = tf.random_uniform((), minval=0, maxval=1)
+    #
+    # def noise_aug_3():
+    #     tmp_image = tf.cast(output_image, tf.float32)
+    #     noise_mask_tensor = tf.random_normal(shape=(), mean=0.0, stddev=10,
+    #                                          dtype=tf.float32)
+    #     tmp_image -= noise_mask_tensor
+    #     tmp_image = tf.cast(tmp_image, tf.float32)
+    #     return tmp_image
+    #
+    # def non_noise_aug_3():
+    #     return output_image
+    #
+    # output_image = tf.cond(tf.less(rnd6, prob), noise_aug_3, non_noise_aug_3)
 
     return output_image, output_mask
 

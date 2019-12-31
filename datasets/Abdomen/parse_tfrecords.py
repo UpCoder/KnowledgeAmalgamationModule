@@ -75,9 +75,9 @@ def parse_tfrecords(dataset_dir, shuffle_size, batch_size, prefetch_size):
     print('the len tfrecord_paths is ', len(tfrecord_paths))
     np.random.seed(2019)
     np.random.shuffle(tfrecord_paths)
-    dataset = tf.data.TFRecordDataset(tfrecord_paths)
+    dataset = tf.data.TFRecordDataset(tfrecord_paths, buffer_size=shuffle_size)
 
-    dataset = dataset.map(lambda x: _parse_function(x, version_name), num_parallel_calls=16)
+    dataset = dataset.map(lambda x: _parse_function(x, version_name), num_parallel_calls=8)
     dataset = dataset.repeat()
     dataset = dataset.shuffle(shuffle_size, seed=2019)
     dataset = dataset.batch(batch_size)
@@ -98,12 +98,12 @@ def parse_tfrecords(dataset_dir, shuffle_size, batch_size, prefetch_size):
 def main_reader():
     from glob import glob
     dataset_dir = [
-        '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/tfrecords',
+        '/media/give/HDD3/ld/Documents/datasets/chen_spleen/tfrecords/V2',
     ]
 
     tfrecord_paths = []
     for dataset_dir in dataset_dir:
-        tfrecord_paths.extend(glob(os.path.join(dataset_dir, '0001.tfrecords')))
+        tfrecord_paths.extend(glob(os.path.join(dataset_dir, '0002.tfrecords')))
     tfrecord_paths = list(set(tfrecord_paths))
     # tfrecord_paths.sort(key=lambda f: int(filter(str.isdigit, f)))
     print('the tfrecord_paths are ', tfrecord_paths)

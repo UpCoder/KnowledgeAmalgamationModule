@@ -1,8 +1,45 @@
 DATA_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/'
 RAW_DATA_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/'
-RAW_DATA_TRAINING_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training'
-RAW_DATA_EVALUATING_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training'
-RAW_DATA_TF_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/tfrecords'
+
+
+class AbdomenDatasetConfig:
+    def __init__(self):
+        self.RAW_DATA_TRAINING_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training'
+        self.RAW_DATA_EVALUATING_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training'
+        self.RAW_DATA_TF_DIR = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/tfrecords'
+        self.img_prefix = 'img'
+        self.label_prefix = 'label'
+        self.labels_mapping = {1: 1, 6: 2}
+
+
+class ChenSpleenDatasetConfig:
+    def __init__(self):
+        self.RAW_DATA_TRAINING_DIR = '/media/give/HDD3/ld/Documents/datasets/chen_spleen/origin_nii'
+        self.RAW_DATA_EVALUATING_DIR = '/media/give/HDD3/ld/Documents/datasets/chen_spleen/origin_nii'
+        self.RAW_DATA_TF_DIR = '/media/give/HDD3/ld/Documents/datasets/chen_spleen/tfrecords'
+        self.img_prefix = 'volume-ID_'
+        self.label_prefix = 'segmentation-ID_'
+        self.labels_mapping = {1: 1}
+
+
+class LiTSDatasetConfig:
+    def __init__(self):
+        self.RAW_DATA_TRAINING_DIR = '/media/give/HDD3/ld/Documents/datasets/LiTS/Training_Batch_2_origin'
+        self.RAW_DATA_EVALUATING_DIR = '/media/give/HDD3/ld/Documents/datasets/LiTS/Training_Batch_1_origin'
+        self.RAW_DATA_TF_DIR = '/media/give/HDD3/ld/Documents/datasets/LiTS/Training_Batch_2_tfrecords'
+        self.img_prefix = 'volume-'
+        self.label_prefix = 'segmentation-'
+        self.labels_mapping = {1: 1}
+
+
+def getDatasetConfigFactory(dataset_name):
+    if dataset_name == 'Abdomen':
+        return AbdomenDatasetConfig()
+    elif dataset_name == 'chen_spleen':
+        return ChenSpleenDatasetConfig()
+    elif dataset_name == 'LiTS':
+        return LiTSDatasetConfig()
+
 # (1) spleen
 # (2) right kidney
 # (3) left kidney
@@ -43,13 +80,33 @@ DATASET_V1 = {
     'window_width': 250,
     'prob': None,
 }
+# Abdomen
+# DATASET_V2 = {
+#     'name': 'V2',
+#     'size': 2623,
+#     'window_center': 100,
+#     'window_width': 500,
+#     'prob': None
+# }
+# spleen
+# DATASET_V2 = {
+#     'name': 'V2',
+#     'size': 8200,
+#     'window_center': 100,
+#     'window_width': 500,
+#     'prob': None
+# }
+
+# LiTS
 DATASET_V2 = {
     'name': 'V2',
-    'size': 1700,
+    'size': 8200,
     'window_center': 100,
-    'window_width': 400,
-    'prob': 0.5
+    'window_width': 500,
+    'prob': None
 }
+
+
 DATASET_V3 = {
     'name': 'V3',
     'size': 1700,

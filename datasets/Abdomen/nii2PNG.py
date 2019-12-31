@@ -25,7 +25,8 @@ def get_nii2npy_func(name):
 
 class Nii2Npys:
     @staticmethod
-    def convert_nii2png_with_label_v2(case_name, labels_mapping={1: 1, 6: 2}, save_dir=None, is_training=True):
+    def convert_nii2png_with_label_v2(case_name, labels_mapping={1: 1, 6: 2}, save_dir=None, is_training=True,
+                                      img_prefix='img', label_prefix='label', Training_DIR=None):
         '''
         1、保存有organ 的slice和 与organ slice数量一半的无器官的slice
         2、organ 结尾的slice和开始的slice 重复取总个数的10%
@@ -35,12 +36,13 @@ class Nii2Npys:
         :param is_training
         :return:
         '''
-        img_path = os.path.join(config.RAW_DATA_TRAINING_DIR, 'img', 'img' + case_name)
-        label_path = os.path.join(config.RAW_DATA_TRAINING_DIR, 'label',
-                                  'label' + case_name)
+
+        img_path = os.path.join(Training_DIR, 'img', img_prefix + case_name)
+        label_path = os.path.join(Training_DIR, 'label',
+                                  label_prefix + case_name)
         if not os.path.exists(img_path):
             print(img_path, ' does not exists')
-            return [], []
+            return None, None
         img = read_nii(img_path)
         label = read_nii(label_path)
         print(np.shape(img), np.shape(label))
@@ -89,7 +91,8 @@ class Nii2Npys:
         all_idxs = list(range(np.shape(img)[-1]))
         without_organ_idxs = list(set(all_idxs) - set(organ_idxs))
         np.random.shuffle(without_organ_idxs)
-        for idx in without_organ_idxs[:int(len(organ_idxs)*0.5)]:
+        # for idx in without_organ_idxs[:int(len(organ_idxs)*0.5)]:
+        for idx in without_organ_idxs:
             label_slice = label[:, :, idx]
             img_slice = img[:, :, idx]
             without_organ_labels.append(label_slice)
@@ -134,18 +137,22 @@ class Nii2Npys:
         return np.asarray(return_imgs, np.int), np.asarray(return_labels, np.int)
 
     @staticmethod
-    def convert_nii2png_with_label_v1(case_name, labels_mapping={1: 1, 6: 2}, save_dir=None, is_training=True):
+    def convert_nii2png_with_label_v1(case_name, labels_mapping={1: 1, 6: 2}, save_dir=None, is_training=True,
+                                      img_prefix='img', label_prefix='label', Training_DIR=None):
         '''
         1、只保存有organ 的slice
         2、每个example 只取一层
         :param case_name: case name, such as '0001.nii'
         :param labels_mapping: label的映射关系
+        :param img_prefix:
+        :param label_prefix
+        :param Training_DIR
         :param save_dir: 保存的目录
         :return:
         '''
-        img_path = os.path.join(config.RAW_DATA_TRAINING_DIR, 'img', 'img' + case_name)
-        label_path = os.path.join(config.RAW_DATA_TRAINING_DIR, 'label',
-                                  'label' + case_name)
+        img_path = os.path.join(Training_DIR, 'img', img_prefix + case_name)
+        label_path = os.path.join(Training_DIR, 'label',
+                                  label_prefix + case_name)
         if not os.path.exists(img_path):
             print(img_path, ' does not exists')
             return [], []
