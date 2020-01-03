@@ -29,14 +29,19 @@ def evaluate_single_teacher(restore_path=None):
     :return:
     '''
     if restore_path is None:
-        restore_path = '/media/give/HDD3/ld/Documents/datasets/LiTS/ck/V2/' \
-                       'liver-unet-resnet-ep49-End-loss0.00018.h5' # 0.95
+        # restore_path = '/media/give/HDD3/ld/Documents/datasets/LiTS/ck/V2/' \
+        #                'liver-unet-resnet-ep49-End-loss0.00018.h5' # 0.95
+        restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck2/V2/' \
+                       'liver_spleen-unet-resnet-False-ep50-End-loss0.00033.h5'
     dataset_config = config.getDatasetConfigFactory('LiTS')
     version_name = os.path.basename(os.path.dirname(restore_path))
     base_name = os.path.basename(restore_path)
     target_name, model_name, backbone_name = base_name.split('-')[:3]
     input_layer = tf.keras.layers.Input(shape=(512, 512, 3))
-    seg_model = SegmentationModel(model_name, backbone_name, 2, name=target_name, input_tensor=input_layer)
+    num_classes = str(target_name).count('_') + 2
+    target_label = 2 if str(target_name).count('_') >= 1 else 1
+    seg_model = SegmentationModel(model_name, backbone_name, num_classes, name=target_name,
+                                  input_tensor=input_layer)
     seg_model.restore(restore_path)
     dices = []
     predictions = []
@@ -66,9 +71,9 @@ def evaluate_single_teacher(restore_path=None):
             label = resized_label
         prediction_probs = seg_model.predict(img, batch_size=8)
         prediction = np.argmax(prediction_probs, axis=-1)
-        save_nii_path = os.path.join(dataset_config.RAW_DATA_EVALUATING_DIR, 'pred',
-                                     'pred_' + target_name + '_' + case_name[:-4] + '.mhd')
-        save_mhd_image(np.transpose(prediction, axes=[0, 2, 1]), save_nii_path)
+        # save_nii_path = os.path.join(dataset_config.RAW_DATA_EVALUATING_DIR, 'pred',
+        #                              'pred_' + target_name + '_' + case_name[:-4] + '.mhd')
+        # save_mhd_image(np.transpose(prediction, axes=[0, 2, 1]), save_nii_path)
         print(np.shape(img), np.shape(label), np.shape(prediction))
         print(np.max(label), np.min(label))
         print(np.max(prediction), np.min(prediction))

@@ -323,7 +323,7 @@ class SegmentationModel:
         return final_loss
 
     def restore(self, restore_path):
-        self.seg_model.load_weights(restore_path)
+        self.seg_model.load_weights(restore_path, by_name=True)
 
     def predict(self, images, batch_size=8):
         return self.seg_model.predict(np.asarray(images, np.float), batch_size=batch_size,

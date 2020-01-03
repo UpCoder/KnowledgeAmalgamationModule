@@ -39,7 +39,7 @@ def non_selective_strategy(t1_prediction, t2_prediction):
     selective_mask = tf.keras.backend.zeros_like(t1_prediction)
     ones_mask = tf.keras.backend.ones_like(t1_prediction)
     selective_mask = tf.where(tf.equal(t1_prediction, 1), ones_mask, selective_mask)
-    selective_mask = tf.where(tf.equal(t2_prediction, 1), ones_mask, selective_mask)
+    selective_mask = tf.where(tf.equal(t2_prediction, 1), tf.cast(ones_mask * 2, tf.int64), selective_mask)
     return selective_mask
 
 

@@ -311,7 +311,7 @@ def evaluate_cls_merged_student():
     # dices are[0.9475870452516191, 0.9351968044777572, 0.953932874864064, 0.8628783860987815, 0.9597844839098552,
     # 0.8200113246511008, 0.8613591209233888, 0.8848770232278296, 0.8473806341455292, 0.9543588673791952]
     restore_path = '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/ck2/V2/' \
-                   'liver_spleen-unet-resnet-False-ep26-End-loss0.00085.h5'
+                   'liver_spleen-unet-resnet-False-ep50-End-loss0.00037.h5'
     dataset_config = config.getDatasetConfigFactory('Abdomen')
     version_name = os.path.basename(os.path.dirname(restore_path))
     base_name = os.path.basename(restore_path)
@@ -386,8 +386,8 @@ def evaluate_cls_merged_student():
 
 
 if __name__ == '__main__':
-    evaluate_single_teacher()
+    # evaluate_single_teacher()
     # evaluate_student()
     # evaluate_cls_student()
-    # evaluate_cls_merged_student()
+    evaluate_cls_merged_student()
     # evaluate_dual_teacher()
