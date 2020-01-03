@@ -4,6 +4,7 @@ from tensorflow.contrib import slim
 import os
 from glob import glob
 from datasets.Abdomen import config
+from datasets.tf_augmentation import get_aug_tensor
 
 
 def read_tfrecords(tf_record_paths):
@@ -39,7 +40,7 @@ def read_tfrecords(tf_record_paths):
         )
 
 
-def _parse_function(proto):
+def _parse_function(proto, version_name):
 
     # define your tfrecord again. Remember that you saved your image as a string.
     # keys_to_features = {'image': tf.FixedLenFeature([], tf.string),
@@ -58,22 +59,25 @@ def _parse_function(proto):
     print('image is ', image)
     print('mask is ', mask)
     # todo augmentation
-
-
+    if config.get_dataset_config(version_name)['prob'] is not None:
+        mask = tf.expand_dims(mask, axis=2)
+        image, mask = get_aug_tensor(image, mask, prob=config.get_dataset_config(version_name)['prob'])
+        mask = tf.squeeze(mask, axis=2)
     return image, mask
 
 
 def parse_tfrecords(dataset_dir, shuffle_size, batch_size, prefetch_size):
     tfrecord_paths = []
     tfrecord_paths.extend(glob(os.path.join(dataset_dir, '*.tfrecords')))
+    version_name = os.path.basename(dataset_dir)
     tfrecord_paths = list(set(tfrecord_paths))
     print('the tfrecord_paths are ', tfrecord_paths)
     print('the len tfrecord_paths is ', len(tfrecord_paths))
     np.random.seed(2019)
     np.random.shuffle(tfrecord_paths)
-    dataset = tf.data.TFRecordDataset(tfrecord_paths)
+    dataset = tf.data.TFRecordDataset(tfrecord_paths, buffer_size=shuffle_size)
 
-    dataset = dataset.map(_parse_function, num_parallel_calls=16)
+    dataset = dataset.map(lambda x: _parse_function(x, version_name), num_parallel_calls=8)
     dataset = dataset.repeat()
     dataset = dataset.shuffle(shuffle_size, seed=2019)
     dataset = dataset.batch(batch_size)
@@ -94,12 +98,12 @@ def parse_tfrecords(dataset_dir, shuffle_size, batch_size, prefetch_size):
 def main_reader():
     from glob import glob
     dataset_dir = [
-        '/media/give/HDD3/ld/Documents/datasets/Abdomen/RawData/Training/tfrecords',
+        '/media/give/HDD3/ld/Documents/datasets/chen_spleen/tfrecords/V2',
     ]
 
     tfrecord_paths = []
     for dataset_dir in dataset_dir:
-        tfrecord_paths.extend(glob(os.path.join(dataset_dir, '0001.tfrecords')))
+        tfrecord_paths.extend(glob(os.path.join(dataset_dir, '0002.tfrecords')))
     tfrecord_paths = list(set(tfrecord_paths))
     # tfrecord_paths.sort(key=lambda f: int(filter(str.isdigit, f)))
     print('the tfrecord_paths are ', tfrecord_paths)
